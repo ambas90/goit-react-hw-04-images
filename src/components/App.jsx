@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import Searchbar from './SearchBar/Searchbar';
 import axios from 'axios';
@@ -13,90 +13,72 @@ axios.defaults.baseURL = 'https://pixabay.com/api/';
 const apiKey = '41220489-c07c1811e7eaf580f7e0f31fa';
 const perPage = 12;
 
-export default class App extends Component {
-  state = {
-    images: [],
-    isLoading: false,
-    error: null,
-    activePage: 1,
-    searchQuery: '',
-    totalImages: 0,
-    modalIsOpen: false,
-    largeImageUrl: '',
-  };
+export default function App() {
+  const [images, setImages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [activePage, setActivePage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [totalImages, setITotalImages] = useState(0);
+  const [modalIsOpen, setModalIsOpen] = useState(false);
+  const [largeImageUrl, setLargeImageUrl] = useState([]);
 
-  searchImages = query => {
+  const searchImages = query => {
     if (query.trim() === '') {
       Notiflix.Notify.info('Sorry, please provide a search word');
       return;
     }
-    this.setState({
-      images: [],
-      activePage: 1,
-      searchQuery: `${Date.now()}/${query}`,
-    });
+    setImages([]);
+    setActivePage(1);
+    setSearchQuery(`${Date.now()}/${query}`);
   };
 
-  loadMoreImages = () => {
-    this.setState(prev => ({ activePage: prev.activePage + 1 }));
+  const loadMoreImages = () => {
+    setActivePage(prev => prev + 1);
   };
 
-  componentDidUpdate = (prevProps, prevState) => {
-    const prevQuery = prevState.searchQuery;
-    const nextQuery = this.state.searchQuery;
-    const prevPage = prevState.activePage;
-    const nexPage = this.state.activePage;
-
-    if (prevQuery !== nextQuery || prevPage !== nexPage) {
-      this.getImages();
-    }
-  };
-
-  showLoadMore = () => {
-    const { images, totalImages, activePage } = this.state;
+  const showLoadMore = () => {
     if (images.length > 0 && totalImages - perPage * activePage > 0) {
       return true;
     }
   };
 
-  showModal = largeImageUrl => {
-    this.setState({
-      modalIsOpen: true,
-      largeImageUrl: largeImageUrl,
-    });
+  const showModal = largeImageUrl => {
+    setModalIsOpen(true);
+    setLargeImageUrl(largeImageUrl);
   };
 
-  closeModal = () => {
-    this.setState({
-      modalIsOpen: false,
-    });
+  const closeModal = () => {
+    setModalIsOpen(false);
   };
 
-  handleClickModal = evt => {
+  const handleClickModal = evt => {
     if (evt.target.nodeName !== 'IMG') {
-      this.closeModal();
+      closeModal();
     }
   };
 
-  handleKeyDown = evt => {
-    if (evt.key === 'Escape' && this.state.modalIsOpen) {
-      this.closeModal();
+  const handleKeyDown = evt => {
+    if (evt.key === 'Escape') {
+      closeModal();
     }
   };
 
-  componentDidMount() {
-    window.addEventListener('keydown', this.handleKeyDown);
-  }
+  useEffect(() => {
+    if (searchQuery) {
+      getImages();
+    }
+  }, [searchQuery, activePage]);
 
-  componentWillUnmount() {
-    window.removeEventListener('keydown', this.handleKeyDown);
-  }
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
-  getImages = async () => {
-    this.setState({
-      isLoading: true,
-    });
-    const { activePage, searchQuery } = this.state;
+  const getImages = async () => {
+    setIsLoading(true);
     const separated = searchQuery.split('/');
     const exstractedQuery = separated[1];
     try {
@@ -114,46 +96,35 @@ export default class App extends Component {
         Notiflix.Notify.warning(`
 I couldn't find any images`);
       }
-      this.setState(prevState => ({
-        images: [...prevState.images, ...data.hits],
-        totalImages: data.total,
-      }));
+      setImages(prev => [...prev, ...data.hits]);
+      setITotalImages(data.total);
     } catch (error) {
-      this.setState({
-        error,
-      });
+      setError(error);
     } finally {
-      this.setState({
-        isLoading: false,
-      });
+      setIsLoading(false);
     }
   };
 
-  render() {
-    const { images, isLoading, modalIsOpen, largeImageUrl, error } = this.state;
-    return (
-      <div className="app">
-        <Searchbar onSubmit={this.searchImages} />
-        <ImageGallery>
-          {images.map(image => (
-            <ImageGalleryItem
-              key={image.id}
-              prewImgUrl={image.webformatURL}
-              largeImgUrl={image.largeImageURL}
-              tags={image.tags}
-              handleClick={this.showModal}
-            />
-          ))}
-        </ImageGallery>
-        {isLoading && <Loader />}
-        {error && <p>Sth went wrong...{error.message}</p>}
-        {this.showLoadMore() > 0 && (
-          <Button handleClick={this.loadMoreImages} />
-        )}
-        {modalIsOpen && (
-          <Modal src={largeImageUrl} handleClick={this.handleClickModal} />
-        )}
-      </div>
-    );
-  }
+  return (
+    <div className="app">
+      <Searchbar onSubmit={searchImages} />
+      <ImageGallery>
+        {images.map(image => (
+          <ImageGalleryItem
+            key={image.id}
+            prewImgUrl={image.webformatURL}
+            largeImgUrl={image.largeImageURL}
+            tags={image.tags}
+            handleClick={showModal}
+          />
+        ))}
+      </ImageGallery>
+      {isLoading && <Loader />}
+      {error && <p>Sth went wrong...{error.message}</p>}
+      {showLoadMore() > 0 && <Button handleClick={loadMoreImages} />}
+      {modalIsOpen && (
+        <Modal src={largeImageUrl} handleClick={handleClickModal} />
+      )}
+    </div>
+  );
 }
